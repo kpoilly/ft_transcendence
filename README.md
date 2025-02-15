@@ -10,6 +10,10 @@ I also did a 3D version of the game using three.js.
 *I worked on an AI being able to play the game, I coded the AI using Pytorch and trained it with the OpenAI Gym library, the goal was to save the weights at different trainging progress to have multiple difficulty levels.
 We decided not to implement the AI as it wasn't fully working properly, but it was fun using Pytorch for the first time, coding my own little artificial neural network and training it.*
 
+team mates: @lnunez-t & @maxmart2
+
+**Final note: Not evaluated yet.**
+
 
 ![image](https://github.com/user-attachments/assets/85629f0d-b697-437e-a5e9-6b59f74721e0)
 
