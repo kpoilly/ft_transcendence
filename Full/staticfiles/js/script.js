@@ -91,7 +91,7 @@ const pagesContent = {
                 <button onclick="navigateTo('online-game-page')" id="online-game" class="game-rectangle">PONG (online)</button>
                 <button onclick="start_3Dgame()" id="game" class="game-rectangle">PONG 3D (local)</button>
             </div>
-            <button onclick="tournament()" id="tournament-game" class="tournament-rectangle">Tournament (1/4)</button>
+            <button onclick="tournament()" id="tournament-game" class="tournament-rectangle">Tournament</button>
         </div>      
     </div>
   `,
@@ -208,6 +208,7 @@ const pagesContent = {
                     </div>
                 </div>
                 <div class="profile-stats">
+                    <canvas id="winChart"></canvas>
                 </div>
             </div>
             <div class="recap-games">
@@ -226,8 +227,7 @@ const pagesContent = {
                     </tbody>
                 </table>
             </div>
-        </div>
-        
+        </div> 
     </div>
   `,
   "game-page": `
@@ -245,8 +245,8 @@ const pagesContent = {
               </div>
         </div>
         <div id='scoreboard'>
-			<h1 id='scores'>0-0</h1>
-		</div>
+            <h1 id='scores'>0-0</h1>
+        </div>
     </div>
   `,
   "online-game-page": `
@@ -350,12 +350,12 @@ const pagesContent = {
 
 // Affichage image de profil sur toutes les pages
 
-//document.addEventListener('DOMContentLoaded', async () => {
 async function initializeProfilePic () {
     try {
+        
         let session = getCookie("user_username");
         console.log("User ID:", session);
-        let url = "https://" + window.location.host + "/user/" + session + '/';
+        let url = "https://" + window.location.host + "/user/" + session +'/';
         console.log(url);
         // Remplace l'URL par l'endpoint de ton API qui retourne l'image de l'utilisateur
         const response = await fetch(url);
@@ -377,8 +377,10 @@ async function initializeProfilePic () {
     } catch (error) {
         console.error('Error loading profile image:', error);
     }
+
 //});
 }
+
 
 function getPageName(page) {
     return page.endsWith('-page') ? page : `${page}-page`;
@@ -394,13 +396,19 @@ function getCurrentTab() {
 // Gestion de la navigation vers les pages avec historique
 
 function navigateTo(page, addToHistory = true) {
-    const normalizedPage = getPageName(page);
+    let normalizedPage = getPageName(page);
     // Vérifie si on veut afficher un profil spécifique
+    let pageName = null;
     let userId = null;
-    if (normalizedPage.startsWith("profile/")) {
-        userId = normalizedPage.split("/")[1]; // Récupère l'ID du joueur depuis l'URL
+    console.log(normalizedPage);
+    if (normalizedPage.startsWith("profile-page/")) {
+        console.log("decoupe user id");
+        pageName = normalizedPage.split("/")[1]; // Récupère l'ID du joueur depuis l'URL
+        userId = pageName.includes("-page") ? pageName.split("-page")[0] : pageName;
         normalizedPage = "profile-page";
+        console.log("navigate to: ", userId);
     }
+
     if (normalizedPage == 'pong-game-page')
         document.body.id = 'pong-game-page';
     else
@@ -411,15 +419,14 @@ function navigateTo(page, addToHistory = true) {
     const app = document.getElementById('pong');
     
     app.innerHTML = "";
-
+    console.log("game page", normalizedPage);
     if (pagesContent[normalizedPage]) {
         app.innerHTML = pagesContent[normalizedPage];
     } else {
         app.innerHTML = `<h1>Page not found</h1>`;
         return;
     }
-
-    initializePageScripts(normalizedPage, getCookie('user_id'));
+    initializePageScripts(normalizedPage, userId);
 }
 
 // Mise a jour des pages quand on clique dessus
@@ -427,11 +434,10 @@ function navigateTo(page, addToHistory = true) {
 function initializePageScripts(page, userId = null) {
     initializeNavbar();
     initializeProfilePic();
-    console.log(page);
     if (page === "home-page") {
         initializeSearchBar();
     }
-    if (page === "profile-page" && userId) {
+    if (page === "profile-page") {
         console.log("this is profile page");
         loadProfilePage(userId);
     }
@@ -455,7 +461,6 @@ window.addEventListener("popstate", (event) => {
 // Initialisation
 document.addEventListener('DOMContentLoaded', () => {
     const initialPage = window.location.hash.replace('#', '') || 'login-page';
-    console.log("hashtag remplace", initialPage);
     navigateTo(initialPage, false); // Pas besoin d'ajouter dans l'historique au chargement
 });
 
@@ -464,7 +469,6 @@ function initializeNavbar() {
         link.addEventListener('click', (event) => {
             event.preventDefault(); // Empêche le rechargement de la page
             const page = link.getAttribute('href').replace('#', ''); // Extrait la page
-            console.log("navbar: ", page);
             navigateTo(page); // Charge la page correspondante
         });
     });
@@ -510,6 +514,58 @@ function getCookie(name) {
 function deleteCookie(name) {
     document.cookie = name + "=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC";
 }
+
+// -------------------------------- HOME PAGE -------------------------------------------------
+
+function initializeSearchBar() {
+    const searchInput = document.getElementById("search-player");
+    const searchResults = document.getElementById("search-results");
+
+    searchInput.addEventListener("input", async function () {
+        const query = searchInput.value.trim().toLowerCase();
+        if (query.length < 1) {
+            searchResults.style.display = "none";
+            return;
+        }
+
+        try {
+            const response = await fetch(`https://${window.location.host}/search-player/?q=${query}`);
+            const players = await response.json();
+
+            searchResults.innerHTML = ""; // Efface les anciens résultats
+            if (players.length === 0) {
+                searchResults.innerHTML = "<div>Aucun joueur trouvé</div>";
+            } else {
+                players.forEach(player => {
+                    const div = document.createElement("div");
+                    div.textContent = player.username || "Deleted User";
+                    div.addEventListener("click", () => {
+                        console.log("home page", player.username);
+                        navigateTo(`profile-page/${player.username}`);
+                    });
+                    searchResults.appendChild(div);
+                });
+            }
+
+            searchResults.style.display = "block";
+        } catch (error) {
+            console.error("Erreur lors de la recherche des joueurs:", error);
+        }
+    });
+
+    // Cacher la liste de résultats si on clique ailleurs
+    document.addEventListener("click", function (event) {
+        if (!searchInput.contains(event.target) && !searchResults.contains(event.target)) {
+            searchResults.style.display = "none";
+        }
+    });
+}
+
+document.addEventListener("click", function (event) {
+        if (event.target.id === "profile-img") {
+            navigateTo('profile-page');
+        }
+    });
 
 // ----------------- LOGIN PAGE ----------------------------------
 
@@ -626,18 +682,19 @@ document.addEventListener("click", async function (event) {
         return;
     }
 
-    if (!_profileImage.files[0]) {
-        errorMessage.textContent = "Please choose a profile image.";
-        return;
-    }
+    // if (!_profileImage.files[0]) {
+    //     errorMessage.textContent = "Please choose a profile image.";
+    //     return;
+    // }
 
 
     const formData = new FormData();
     formData.append('username', _username);
     formData.append('password', _password);
     formData.append('email', _email);
-    formData.append('image_avatar', _profileImage.files[0]);
-
+    if (_profileImage.files[0]) {
+        formData.append("image_avatar", _profileImage.files[0]);
+    }
     console.table(Array.from(formData.entries()));
 
     console.table(window.location.host);
@@ -687,7 +744,7 @@ function setupSettingsPage() {
             const imageUploadInput = document.getElementById("newImageUpload");
             const saveButton = document.getElementById("save-settings");
 
-            console.log("settingsImgContainer:", settingsImgContainer);
+            console.log(settingsImgContainer);
             
             // Vérifie s'il y a déjà une image, sinon met une image par défaut
             if (data.user.image_avatar) {
@@ -722,6 +779,7 @@ function setupSettingsPage() {
 
                 if (username !== "") {
                     formData.append('username', username);
+                    document.cookie = "user_username=" + username;
                 }
                 if (email !== "") {
                     formData.append('email', email);
@@ -765,27 +823,137 @@ function setupSettingsPage() {
         .catch(error => console.error("Erreur lors du chargement du user_id :", error));
 }
 
-document.addEventListener("click", async function (event) {
+/* function setupSettingsPage() {
+    document.addEventListener("click", async function (event) {
     if (document.getElementById("settings-page")) {
-        if (event.target && event.target.id === "logout") {
-            event.preventDefault();
-            const response = await fetch("https://" + window.location.host + "/logout/", {
-                method: "POST",
-                credentials: "include", // ✅ Inclure les cookies de session
-            });
-            if (response.ok) {
-                console.log("Déconnexion réussie !");
-                document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-                document.cookie = "user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-                document.cookie = "user_username=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-                navigateTo("login-page");            
-            } else {
-                console.error("Erreur lors de la déconnexion.");
-            }
+    let session = getCookie("user_username");
+    console.log("User ID:", session);
+    let url = "https://" + window.location.host + "/user/" + session +'/';
+    console.log(url);
+    fetch(url)
+        .then(response => response.json())
+        .then(async data => {
+            console.log("User ID from API:", data);
+            let userID = data.user.id;
+
+            const settings_img = document.getElementById("settings-img");
+                    
+            const li = document.createElement("li");
+
+            if (event.target && event.target.id === "save-settings") {
+                event.preventDefault();
+            if (data.user.image_avatar !== null)
+                li.innerHTML = `<img id="newImagePreview" class="preview" src=${data.user.image_avatar}>`;
+            else
+                li.innerHTML = `<img id="newImagePreview" class="preview" src="static/img/person.png">`;
+            settings_img.appendChild(li);
             
-    }
+            
+            
+                // Récupère les valeurs du formulaire
+                const _profileImage = document.getElementById('newImageUpload');
+                const _username = document.getElementById('username').value.trim();
+                const _password = document.getElementById('password2').value.trim();
+                const _confirmPassword = document.getElementById('confirm-password').value.trim();
+                const _email = document.getElementById('email').value.trim();
+        
+                const formData = new FormData();
+        
+                formData.append('player_id', userID);
+        
+                if (_username !== "") {
+                    formData.append('username', _username);
+                }
+        
+                if (_email !== "") {
+                    formData.append('email', _email);
+                }
+        
+                if (_profileImage.files[0]) {
+                    formData.append('image_avatar', _profileImage.files[0]);
+                }
+                if (_password !== "") {
+                    formData.append('password', _password);
+                }
+                if (_password !== "" && _confirmPassword !== "" && _password !== _confirmPassword) {
+                    errorMessage.textContent = "Passwords are not the same.";
+                    return ;
+                } else if (_password === "" && _confirmPassword !== "") {
+                    errorMessage.textContent = "Please enter a new password before confirming.";
+                    return ;
+                }
+        
+                console.table(Array.from(formData.entries()));
+                
+                try {
+                    // Envoie une requête POST à l'API
+                    const response = await fetch("https://" + window.location.host + "/update-player/", {
+                        method: "PUT",
+                        body: formData,
+                    });
+        
+                    if (!response.ok) {
+                        throw new Error('Error while submitting the form');
+                    }
+            
+                    const result = await response.json();
+                    console.log('Success:', result);
+                    navigateTo("settings-page");
+                    
+                } catch (error) {
+                    console.error('Error:', error);
+                    errorMessage.textContent = "An error occurred. Please try again.";
+                }
+            
+            }
+        })
+        
+        .catch(error => console.error("Erreur lors du chargement des param du user_id :", error));  
 }
+    });
+} */
+
+document.addEventListener("click", async function (event) {
+    if (document.getElementById("settings-page")) {  
+        if (event.target && event.target.id === "logout") {  
+            event.preventDefault();
+            console.log("🔹 Bouton Logout cliqué !");
+
+            try {
+                const response = await fetch("https://" + window.location.host + "/logout/", {
+                    method: "POST",
+                    headers: { 
+                        "Authorization": "Bearer " + getCookie("access_token"),
+                    },
+                    credentials: "include", // ✅ Inclure les cookies de session
+                });
+                console.log(response)
+                if (response.ok) {
+                    console.log("✅ Déconnexion réussie !");
+                    
+                    // ✅ Supprime les cookies en tenant compte du domaine
+                    document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+                    document.cookie = "user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+                    document.cookie = "user_username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+                    
+                    console.log("🧹 Cookies supprimés !");
+                    
+                    // ✅ Redirige l'utilisateur vers la page de login
+                    navigateTo("login-page");            
+
+                } else {
+                    console.error("❌ Erreur lors de la déconnexion. Statut HTTP:", response.status);
+                    const errorData = await response.json();
+                    console.error("Détails :", errorData);
+                }
+            } catch (error) {
+                console.error("🚨 Erreur réseau lors de la requête de déconnexion :", error);
+            }
+        }
+    }
 });
+    
+
 
 // --------------------------- LEADERBOARD PAGE -------------------
 
@@ -875,13 +1043,22 @@ function setFriendsPage() {
         removeButtonsContainer.innerHTML = "";
 
         data.user.friends.forEach(friend => {
+            // Déterminer la classe de l'indicateur en fonction du statut en ligne
+            const statusClass = friend.online ? "online" : "offline";
+
             // Création de l'élément pour chaque ami
             const friendElement = document.createElement("p");
             friendElement.classList.add("ranklist-player");
             friendElement.innerHTML = `
-                <img src="${friend.image_avatar || 'static/img/fox.png'}" alt="Profile" class="ranklist-img">
-                ${friend.username}
+                <div class="profile-container">
+                    <div class="status-indicator ${statusClass}"></div>
+                    <img src="${friend.image_avatar || 'static/img/fox.png'}" alt="Profile" class="ranklist-img">
+                </div>
+                <a href="#profile-page" onclick="navigateTo('profile-page/${friend.username}')">
+        ${friend.username}
+    </a>
             `;
+            console.log("friend code : ", friendElement);
             friendsContainer.appendChild(friendElement);
 
             // Bouton Remove pour chaque ami
@@ -894,7 +1071,7 @@ function setFriendsPage() {
         });
     })
     .catch(error => console.error("Error loading friends list:", error));
-
+    
     // Ajout d'un ami
     document.querySelector(".add-friend").addEventListener("click", () => {
         const username = document.getElementById("user").value.trim();
@@ -971,16 +1148,18 @@ function removeFriend(username, buttonElement) {
 // ------------------------ PROFILE PAGE ---------------------------
 
 
-function loadProfilePage() {
+function loadProfilePage(userId) {
     // Récupérer l'ID de l'utilisateur connecté (session) ou l'ID passé dans l'URL
-    let session = getCookie("user_username");
-    if (!session) {
+    if (!userId) {
+    userId = getCookie("user_username");
+    if (!userId) {
         console.error("Utilisateur non connecté");
         return;
     }
-
+}
+    console.log("user :", userId);
     // Récupérer les informations utilisateur depuis l'API
-    let url = `https://${window.location.host}/user/${session}/`;
+    let url = `https://${window.location.host}/user/${userId}/`;
     fetch(url)
         .then(response => {
             if (!response.ok) throw new Error('Échec du chargement des informations utilisateur');
@@ -1021,11 +1200,20 @@ function loadProfilePage() {
                 <p class="item-nb">${data.user.nb_friends}</p>
                 <p class="item-title">Friends</p>`;
 
+            
+        
+                
+            populateMatchHistory(data,userId);
+            fetchVictories(data.user.username);
+           
+
             // Ajouter les éléments dans la page
             user.appendChild(li);
             games.appendChild(li2);
             win.appendChild(li3);
             friends.appendChild(li4);
+
+            
 
         })
         .catch(error => {
@@ -1033,35 +1221,54 @@ function loadProfilePage() {
         });
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
-    let session = getCookie("user_username"); // Récupère l'ID du joueur connecté
-    let url = `https://${window.location.host}/user/${session}`; // API pour récupérer les matchs
+    
 
-    try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Erreur de chargement des matchs");
 
-        const matches = await response.json();
-        History(matches);
-    } catch (error) {
-        console.error("Erreur :", error);
-    }
-});
+async function fetchVictories(user) {
+    const response = await fetch(`/victories-per-day/` + user + `/`);
+    const data = await response.json();
+    
+    const winPercentage = data.win_percentage;
+    const losePercentage = 100 - winPercentage;
 
-// Fonction pour afficher les matchs dans le tableau
-function populateMatchHistory(matches) {
+    new Chart(document.getElementById('winChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Victoires', 'Défaites'],
+            datasets: [{
+                data: [winPercentage, losePercentage],
+                backgroundColor: ['green', 'red']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: true,
+                    text: 'Pourcentage de Victoires'
+                }
+            }
+        }
+    });
+}
+
+function populateMatchHistory(matches,currentUser) {
     console.log(matches);
     const tbody = document.querySelector("#match-history tbody");
-    tbody.innerHTML = ""; // Vider le tableau avant d'ajouter les nouveaux résultats
+    tbody.innerHTML = ""; // Vide le tableau avant de le remplir
 
-    const currentUser = getCookie("user_username");
 
     // Tri des matchs par date (du plus récent au plus ancien)
     console.log(matches.user.games_history);
     const matchHistory = Object.values(matches.user.games_history);
     matchHistory.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
-    matchHistory.forEach(match => {
+    const latestMatches = matchHistory.slice(0, 5);
+
+    latestMatches.forEach(match => {
         const row = document.createElement("tr");
 
         // On regarde si l'opponent existe toujours dans la db
@@ -1073,71 +1280,122 @@ function populateMatchHistory(matches) {
         } else {
             opponentName = "Deleted User"; // Cas improbable mais on le gère
         }
-        
+
+        let opponentHTML = opponentName !== "Deleted User"
+            ? `<a href="#profile-page" onclick="navigateTo('profile-page/${opponentName}')"  class="profile-link" data-username="${opponentName}">${opponentName}</a>`
+            : opponentName;
+
         // ✅ Ajoute une classe dynamique sur le texte "win" ou "lose"
         const resultClass = match.result.toLowerCase() === "win" ? "win-text" : "lose-text";
 
         row.innerHTML = `
-            <td>${opponentName}</td>
+            <td>${opponentHTML}</td>
             <td>${new Date(match.date).toLocaleDateString()}</td>
             <td><span class="${resultClass}">${match.result}</span></td>
-            <td>${match.score[1]}-${match.score[2]}</td>
+            <td>${match.score[1]}/${match.score[2]}</td>
         `;
 
         tbody.appendChild(row);
     });
-}
-
-// -------------------------------- HOME PAGE -------------------------------------------------
-
-function initializeSearchBar() {
-    const searchInput = document.getElementById("search-player");
-    const searchResults = document.getElementById("search-results");
-
-    searchInput.addEventListener("input", async function () {
-        const query = searchInput.value.trim().toLowerCase();
-        if (query.length < 1) {
-            searchResults.style.display = "none";
-            return;
-        }
-
-        try {
-            const response = await fetch(`https://${window.location.host}/search-player/?q=${query}`);
-            const players = await response.json();
-
-            searchResults.innerHTML = ""; // Efface les anciens résultats
-            if (players.length === 0) {
-                searchResults.innerHTML = "<div>Aucun joueur trouvé</div>";
-            } else {
-                players.forEach(player => {
-                    const div = document.createElement("div");
-                    div.textContent = player.username || "Deleted User";
-                    div.addEventListener("click", () => {
-                        navigateTo(`profile-page/${player.id}`);
-                    });
-                    searchResults.appendChild(div);
-                });
-            }
-
-            searchResults.style.display = "block";
-        } catch (error) {
-            console.error("Erreur lors de la recherche des joueurs:", error);
-        }
-    });
-
-    // Cacher la liste de résultats si on clique ailleurs
-    document.addEventListener("click", function (event) {
-        if (!searchInput.contains(event.target) && !searchResults.contains(event.target)) {
-            searchResults.style.display = "none";
-        }
+    document.querySelectorAll(".profile-link").forEach(link => {
+        link.addEventListener("click", function (event) {
+            event.preventDefault();
+            const username = this.dataset.username;
+            navigateToProfile(username);
+        });
     });
 }
+//----------------------PAGE PROFILE FRIEND----------------
+document.addEventListener("DOMContentLoaded", () => {
+    const app = document.getElementById("pong");
 
-document.addEventListener("click", function (event) {
-        if (event.target.id === "profile-img") {
-            navigateTo('profile-page');
+    // Gestion de la navigation
+    function handleNavigation() {
+        const path = window.location.pathname;
+        console.log("📌 Nouvelle URL détectée :", path);
+
+        if (path.startsWith("/profile/")) {
+            const username = path.split("/")[2]; // Récupérer le username
+            loadUserProfile(username);
         }
-    });
+    }
+
+    // Charger la page au changement d'URL
+    window.addEventListener("popstate", handleNavigation);
+    handleNavigation();
+});
+
+// Charger les infos du profil utilisateur
+async function loadUserProfile(username) {
+    console.log("🔍 Chargement du profil de :", username);
+    const app = document.getElementById("pong");
+
+    app.innerHTML = `
+        <div id="profile-page">
+            <h1>Profil de <span id="profile-username"></span></h1>
+            <img id="profile-image" src="static/img/person.png" alt="Profile">
+            <p id="profile-info">Chargement...</p>
+            <button onclick="history.back()">Retour</button>
+        </div>
+    `;
+
+    try {
+        const response = await fetch(`https://${window.location.host}/user/${username}/`);
+        if (!response.ok) throw new Error("Utilisateur introuvable");
+
+        const data = await response.json();
+
+        document.getElementById("profile-username").textContent = data.user.username;
+        document.getElementById("profile-image").src = data.user.image_avatar || "static/img/person.png";
+        document.getElementById("profile-info").textContent = `Email : ${data.user.email}`;
+
+    } catch (error) {
+        console.error("❌ Erreur lors du chargement du profil :", error);
+        document.getElementById("profile-info").textContent = "Utilisateur introuvable.";
+    }
+}
+// document.addEventListener("DOMContentLoaded", async function () {
+//     const searchInput = document.getElementById("search-player");
+//     const searchResults = document.getElementById("search-results");
+
+//     searchInput.addEventListener("input", async function () {
+//         const query = searchInput.value.trim().toLowerCase();
+//         if (query.length < 1) {
+//             searchResults.style.display = "none";
+//             return;
+//         }
+
+//         try {
+//             const response = await fetch(`https://${window.location.host}/search-player/?q=${query}`);
+//             const players = await response.json();
+
+//             searchResults.innerHTML = ""; // Efface les anciens résultats
+//             if (players.length === 0) {
+//                 searchResults.innerHTML = "<div>Aucun joueur trouvé</div>";
+//             } else {
+//                 players.forEach(player => {
+//                     const div = document.createElement("div");
+//                     div.textContent = player.username || "Deleted User";
+//                     div.addEventListener("click", () => {
+//                         navigateTo(`profile-page/${player.id}`);
+//                     });
+//                     searchResults.appendChild(div);
+//                 });
+//             }
+
+//             searchResults.style.display = "block";
+//         } catch (error) {
+//             console.error("Erreur lors de la recherche des joueurs:", error);
+//         }
+//     });
+
+//     // Cacher la liste de résultats si on clique ailleurs
+//     document.addEventListener("click", function (event) {
+//         if (!searchInput.contains(event.target) && !searchResults.contains(event.target)) {
+//             searchResults.style.display = "none";
+//         }
+//     });
+// });
 
 // ---------------- GAME -----------------------------------------
 
@@ -1219,6 +1477,7 @@ function load_tourn_game(){
             navigateTo('pong-game-page', true);
             const pongGameTab = document.getElementById('pong-game');
             const canvas = document.createElement('canvas')
+            canvas.id = "Pong-Multi"
             pongGameTab.appendChild(canvas);
             const script = document.createElement('script');
             script.src = pongtourney_url;
@@ -1249,7 +1508,6 @@ function start_3Dgame(){
     const div = document.createElement('div')
     div.id = 'gameCanvas'
     pongGameTab.appendChild(div);
-
     const script = document.createElement('script');
     script.src = pong3d_url;
     script.defer = true;
@@ -1267,13 +1525,14 @@ function start_3Dgame(){
 }
 
 function load_game(difficulty){
-    window.location.href='create-game/' + difficulty + '/'
+    window.location.href='create-game/' + difficulty + '/';
     wait_cookie();
     function wait_cookie(){
         if (document.cookie.includes('match_id')){
             navigateTo('pong-game-page', true);
             const pongGameTab = document.getElementById('pong-game');
             const canvas = document.createElement('canvas')
+            canvas.id = "Pong-Multi"
             pongGameTab.appendChild(canvas);
             const script = document.createElement('script');
             script.src = pong_url;

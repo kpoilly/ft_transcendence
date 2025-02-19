@@ -469,6 +469,7 @@ function start_game(socket)
 					}));
 				}
 				else{
+					console.log('Sent get next');
 					bracket = result;
 					socket_tourn.send(JSON.stringify({
 						'type': 'get_next_game',
@@ -483,7 +484,7 @@ function start_game(socket)
 
 	socket_tourn.onmessage = function(event) {
 		const data = JSON.parse(event.data);
-		console.log("Received new " + data.type + "\n");
+		// console.log("Received new " + data.type + "\n");
 
 		switch (data.type) {
 			case 'next_game':
@@ -560,7 +561,6 @@ function init_game()
 	player_id = getCookieValue('user_id')
 	this.match_id = getCookieValue('match_id')
 	console.log("Match_id: " + this.match_id);
-	console.log("Player_id: " + player_id);
 
 	socket = new WebSocket('wss://' + window.location.host + '/ws/game/' + this.match_id + '/');
 
@@ -603,7 +603,7 @@ function init_game()
 			else
 				player_nb = 'spectator'
 
-			console.log("game is all set");
+			console.log("game is ready.");
 			console.log("Player1: " + player1.name);
 			console.log("Player2: " + player2.name);
 			start_game(socket);
@@ -612,9 +612,9 @@ function init_game()
 	};
 
 	socket.onclose = function(e) {
-		console.error('Socket WebSocket closed');
+		console.log('Socket WebSocket closed');
 	};
 	socket.onerror = function(err) {
-		console.error('Error WebSocket :', err);
+		// console.error('Error WebSocket :', err);
 	};
 }
