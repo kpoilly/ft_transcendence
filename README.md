@@ -12,7 +12,7 @@ We decided not to implement the AI as it wasn't fully working properly, but it w
 
 team mates: @lnunez-t & @maxmart26
 
-**Final note: Not evaluated yet.**
+**Final note: 110%**
 
 
 ![image](https://github.com/user-attachments/assets/85629f0d-b697-437e-a5e9-6b59f74721e0)
